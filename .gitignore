@@ -1,0 +1,7 @@
+Listings/*
+DebugConfig/*
+Objects/*
+!Objects/*.hex
+!Objects/*.axf
+SI/*
+.vscode/*
