@@ -21,7 +21,7 @@ int main(void)
 	{
 		if(PAR_TimeFlag_1ms == 0)
 		{	
-			PAR_TimeFlag_1ms = PAR_TIME_STEMP_DUR_1MS;
+			PAR_TimeFlag_1ms = PAR_TIME_STEMP_DUR_1MS;	
 			Iwdg_FeedDog();
 		}
 		if(PAR_TimeFlag_5ms == 0)

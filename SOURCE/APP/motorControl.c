@@ -53,9 +53,9 @@ Mc_LpParType Mc_Lp_Ibeta = {
 	2000,
 	0,
 };
-Mc_LpParType Mc_inte_Check = {
-	161,
-	35,
+Mc_LpParType Mc_Lp_ActSpeed = {
+	2000,
+	2000,
 	0,
 };
 Mc_LpParType Mc_inte_Vsa = {
@@ -69,21 +69,35 @@ Mc_LpParType Mc_inte_Vsb = {
 	35,
 	0,
 };
-
-
+Mc_LpParType Mc_inte_AnglePll = {
+	161,
+	35,
+	0,
+};
 s16 Mc_StatorResistor = 1;
 s16 Mc_StatorInductor = 1;
 
+
+
 typedef struct
-{
-	s32 integration_Volt_Alpha;
-	s32 integration_Volt_Beta;
+{	
+
+	s16 actSpeed;
+
 	s32 rsiaQ16;
 	s32 rsibQ16;
 	s32 lsiaQ16;
 	s32 lsibQ16;
-	s32 fluxAlpha;
-	s32 fluxBeta;
+	
+	s32 fluxAlphaQ16;
+	s32 fluxBetaQ16;
+
+	u16 fluxCalAngle;
+	u16 fluxCalAngleLast;
+	u32 fluxAmpQ16;
+
+	u16 fluxAnglePll;
+	s16 angleSpeedPll;
 } foc_svm_para_struct;
 foc_svm_para_struct FOCSystemCtrl;
 
@@ -211,15 +225,40 @@ void Mc_FluxAngleCal(s16 ualpha, s16 ubeta, s16 curalpha, s16 curbeta)
 	FOCSystemCtrl.lsibQ16 = ((s32)Mc_StatorInductor * (s32)curbeta*65536)/1000;
 	FOCSystemCtrl.rsiaQ16 = ((s32)Mc_StatorResistor * (s32)curalpha*65536)/1000;
 	FOCSystemCtrl.rsibQ16 = ((s32)Mc_StatorResistor * (s32)curbeta*65536)/1000;
-	FOCSystemCtrl.fluxAlpha = Mc_LowPassFilter(&Mc_inte_Vsa, ((s32)ualpha*65536)/10 - FOCSystemCtrl.rsiaQ16) - FOCSystemCtrl.lsiaQ16;
-	FOCSystemCtrl.fluxBeta = Mc_LowPassFilter(&Mc_inte_Vsb, ((s32)ubeta*65536)/10 - FOCSystemCtrl.rsibQ16) - FOCSystemCtrl.lsibQ16;
-	CalAngle = Math_ArcTanCal(FOCSystemCtrl.fluxAlpha,FOCSystemCtrl.fluxBeta,&FluxAmp);
+	FOCSystemCtrl.fluxAlphaQ16 = Mc_LowPassFilter(&Mc_inte_Vsa, ((s32)ualpha*65536)/10 - FOCSystemCtrl.rsiaQ16) - FOCSystemCtrl.lsiaQ16;
+	FOCSystemCtrl.fluxBetaQ16 = Mc_LowPassFilter(&Mc_inte_Vsb, ((s32)ubeta*65536)/10 - FOCSystemCtrl.rsibQ16) - FOCSystemCtrl.lsibQ16;
+	FOCSystemCtrl.fluxCalAngleLast = FOCSystemCtrl.fluxCalAngle;
+	FOCSystemCtrl.fluxCalAngle = Math_ArcTanCal(FOCSystemCtrl.fluxAlphaQ16,FOCSystemCtrl.fluxBetaQ16,&FOCSystemCtrl.fluxAmpQ16);
 
 }
-s16 lpCheck = 0;
-s16 value_sin = 0;
-s16 value_cos_minu = 0;
-s16 lpInteCheck = 0;
+s16 pllKp = 1;
+u8 PLLSpeedSwitchFlag = 0;
+void Mc_AnglePll(void)
+{
+	s32 deltaAngle = 0;
+	s32 omega = 0;
+	static u16 anglePllLast = 0;
+	
+	deltaAngle = (s32)FOCSystemCtrl.fluxCalAngle - (s32)FOCSystemCtrl.fluxAnglePll;
+	if(PLLSpeedSwitchFlag ==0)
+	{
+		FOCSystemCtrl.angleSpeedPll = Mc_Electric_Speed;
+	}
+	else
+	{
+		if(FOCSystemCtrl.fluxAnglePll > anglePllLast)
+			FOCSystemCtrl.angleSpeedPll = FOCSystemCtrl.fluxAnglePll - anglePllLast;
+
+	}
+	omega = (s32)deltaAngle  + (s32)FOCSystemCtrl.angleSpeedPll;
+	anglePllLast = FOCSystemCtrl.fluxAnglePll;
+	FOCSystemCtrl.fluxAnglePll = Mc_LowPassFilter(&Mc_inte_AnglePll,((s32)omega * (s32)pllKp)/100);	
+}
+u8 closeLoopFlag = 0;
+u16 AngleDelta = 0;
+u16 calAngleAddDelta = 0;
+u16 speedCnt = 0;
+u16 speedSum = 0;
 void Mc_Svpwm(void)
 {
 	u16 angle = 0;
@@ -228,14 +267,10 @@ void Mc_Svpwm(void)
 	s16 currentC = 0;
 	s16 dutyAlpha = 0;	
 	s16 dutyBeta = 0;
-	Mc_Electric_Angle += Mc_Electric_Speed;
+	
 	angle = (1500 * Mc_Electric_Angle) >> 16;
 	dutyAlpha = ((s32)Mc_Electric_Duty * Math_Cos(angle)) >> 15;
 	dutyBeta = ((s32)Mc_Electric_Duty * Math_Sin(angle)) >> 15;
-
-	value_sin = (100*Math_Sin(angle))>>15;
-	value_cos_minu = (-100* Math_Cos(angle)) >> 15;
-	lpInteCheck = (Mc_LowPassFilter(&Mc_inte_Check, value_sin));
 
 	
 	Mc_Svpwm_NSectorCal(dutyAlpha,dutyBeta);
@@ -273,6 +308,31 @@ void Mc_Svpwm(void)
 	Mc_PhaseCurrent_Beta_FL = (Mc_LowPassFilter(&Mc_Lp_Ibeta, Mc_PhaseCurrent_Beta));
 
 	Mc_FluxAngleCal(Mc_Volt_Ualpha, Mc_Volt_Ubeta, Mc_PhaseCurrent_Alpha_FL, Mc_PhaseCurrent_Beta_FL);
+
+	//Mc_FluxAngleCal(Mc_Volt_Ualpha, Mc_Volt_Ubeta, Mc_PhaseCurrent_Alpha, Mc_PhaseCurrent_Beta);
+	Mc_AnglePll();
+
+
+	if( (FOCSystemCtrl.fluxCalAngle < 2000) && (FOCSystemCtrl.fluxCalAngleLast > 63000))
+	{
+		FOCSystemCtrl.actSpeed = Mc_LowPassFilter(&Mc_Lp_ActSpeed,speedSum / speedCnt);
+		speedCnt = 0;
+		speedSum = 0;
+	}
+	else
+	{
+		speedSum += FOCSystemCtrl.fluxCalAngle - FOCSystemCtrl.fluxCalAngleLast;
+		speedCnt++;
+	}
+	
+	if(closeLoopFlag > 0)
+	{
+		Mc_Electric_Angle = FOCSystemCtrl.fluxCalAngle + AngleDelta;
+	}
+	
+	Mc_Electric_Angle += Mc_Electric_Speed;
+	
+	
 }
 
 
