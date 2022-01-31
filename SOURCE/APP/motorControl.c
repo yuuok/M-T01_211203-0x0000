@@ -98,6 +98,8 @@ typedef struct
 
 	u16 fluxAnglePll;
 	s16 angleSpeedPll;
+	u16 speedPllSum;
+	u16 speedPllCnt;
 } foc_svm_para_struct;
 foc_svm_para_struct FOCSystemCtrl;
 
@@ -215,6 +217,27 @@ void Mc_Svpwm_TcmCal(u8 N,s16 T1, s16 T2)
 	}	 
 
 }
+
+
+u8 Mc_AngleSpeedCal(u16 angle, u16 angleLast, s16* speedPtr, u16* sum, u16* cnt)
+{
+	u8 caled = 0;
+	if( (angle < 2000) && (angleLast > 63000))
+	{
+		*speedPtr = (*sum)/(*cnt);
+		*sum = 0;
+		*cnt = 0;
+		caled = 1;
+	}
+	else
+	{
+		*sum += angle - angleLast;
+		(*cnt)++;
+	}
+	return caled;
+}
+
+
 u16 CalAngle = 0;
 u32 FluxAmp = 0;
 void Mc_FluxAngleCal(s16 ualpha, s16 ubeta, s16 curalpha, s16 curbeta)
@@ -231,8 +254,7 @@ void Mc_FluxAngleCal(s16 ualpha, s16 ubeta, s16 curalpha, s16 curbeta)
 	FOCSystemCtrl.fluxCalAngle = Math_ArcTanCal(FOCSystemCtrl.fluxAlphaQ16,FOCSystemCtrl.fluxBetaQ16,&FOCSystemCtrl.fluxAmpQ16);
 
 }
-s16 pllKp = 1;
-u8 PLLSpeedSwitchFlag = 0;
+s16 pllKp = 100;
 void Mc_AnglePll(void)
 {
 	s32 deltaAngle = 0;
@@ -240,20 +262,12 @@ void Mc_AnglePll(void)
 	static u16 anglePllLast = 0;
 	
 	deltaAngle = (s32)FOCSystemCtrl.fluxCalAngle - (s32)FOCSystemCtrl.fluxAnglePll;
-	if(PLLSpeedSwitchFlag ==0)
-	{
-		FOCSystemCtrl.angleSpeedPll = Mc_Electric_Speed;
-	}
-	else
-	{
-		if(FOCSystemCtrl.fluxAnglePll > anglePllLast)
-			FOCSystemCtrl.angleSpeedPll = FOCSystemCtrl.fluxAnglePll - anglePllLast;
-
-	}
+	(void)Mc_AngleSpeedCal(FOCSystemCtrl.fluxAnglePll, anglePllLast, &FOCSystemCtrl.angleSpeedPll, &FOCSystemCtrl.speedPllSum, &FOCSystemCtrl.speedPllCnt);
 	omega = (s32)deltaAngle  + (s32)FOCSystemCtrl.angleSpeedPll;
 	anglePllLast = FOCSystemCtrl.fluxAnglePll;
-	FOCSystemCtrl.fluxAnglePll = Mc_LowPassFilter(&Mc_inte_AnglePll,((s32)omega * (s32)pllKp)/100);	
+	FOCSystemCtrl.fluxAnglePll += ((s32)omega * (s32)pllKp)/100;	
 }
+
 u8 closeLoopFlag = 0;
 u16 AngleDelta = 0;
 u16 calAngleAddDelta = 0;
@@ -309,21 +323,9 @@ void Mc_Svpwm(void)
 
 	Mc_FluxAngleCal(Mc_Volt_Ualpha, Mc_Volt_Ubeta, Mc_PhaseCurrent_Alpha_FL, Mc_PhaseCurrent_Beta_FL);
 
-	//Mc_FluxAngleCal(Mc_Volt_Ualpha, Mc_Volt_Ubeta, Mc_PhaseCurrent_Alpha, Mc_PhaseCurrent_Beta);
 	Mc_AnglePll();
 
-
-	if( (FOCSystemCtrl.fluxCalAngle < 2000) && (FOCSystemCtrl.fluxCalAngleLast > 63000))
-	{
-		FOCSystemCtrl.actSpeed = Mc_LowPassFilter(&Mc_Lp_ActSpeed,speedSum / speedCnt);
-		speedCnt = 0;
-		speedSum = 0;
-	}
-	else
-	{
-		speedSum += FOCSystemCtrl.fluxCalAngle - FOCSystemCtrl.fluxCalAngleLast;
-		speedCnt++;
-	}
+	(void)Mc_AngleSpeedCal(FOCSystemCtrl.fluxCalAngle, FOCSystemCtrl.fluxCalAngleLast, &FOCSystemCtrl.actSpeed, &speedSum, &speedCnt);
 	
 	if(closeLoopFlag > 0)
 	{
