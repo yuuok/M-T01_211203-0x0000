@@ -329,14 +329,28 @@ void Mc_Svpwm(void)
 	
 	if(closeLoopFlag > 0)
 	{
-		Mc_Electric_Angle = FOCSystemCtrl.fluxCalAngle + AngleDelta;
+		Mc_Electric_Angle = FOCSystemCtrl.fluxAnglePll + AngleDelta + FOCSystemCtrl.angleSpeedPll;
+	}
+	else
+	{
+		Mc_Electric_Angle += Mc_Electric_Speed;
 	}
 	
-	Mc_Electric_Angle += Mc_Electric_Speed;
 	
 	
 }
 
+
+
+
+void Mc_FocMainFunc(void)
+{
+	//volt
+	//current
+	//fluxcal
+	//anglepll
+	//svm
+}
 
 
 

@@ -1,7 +1,4 @@
 SET PATH=C:\APPLICATION\KEIL_V5\ARM\ARMCLANG\Bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\APPLICATION\Git\cmd;C:\APPLICATION\Polyspace\R2021a\runtime\win64;C:\APPLICATION\Polyspace\R2021a\bin;C:\APPLICATION\Polyspace\R2021a\polyspace\bin;C:\Program Files\Microsoft SQL Server\120\Tools\Binn\;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Windows\system32\config\systemprofile\.dnx\bin;C:\Program Files\Microsoft DNX\Dnvm\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\APPLICATION\opencv\build\x64\vc14\bin;C:\APPLICATION\opencv\opencv_rebuild\install\x64\vc14\bin;C:\Cadence\SPB_16.6\openaccess\bin\win32\opt;C:\Cadence\SPB_16.6\tools\capture;C:\Cadence\SPB_16.6\tools\pspice;C:\Cadence\SPB_16.6\tools\specctra\bin;C:\Cadence\SPB_16.6\tools\fet\bin;C:\Cadence\SPB_16.6\tools\libutil\bin;C:\Cadence\SPB_16.6\tools\bin;C:\Cadence\SPB_16.6\tools\pcb\bin;C:\Users\12491\AppData\Local\Microsoft\WindowsApps;;C:\APPLICATION\Microsoft VS Code\bin;C:\APPLICATION\CMake\bin
-SET ARMCC6_ASMOPT=--diag_suppress=9931
-SET ARMCC6_CCOPT=--diag_suppress=9931
-SET ARMCC6_LINKOPT=--diag_suppress=9931
 SET CPU_TYPE=STM32F103RB
 SET CPU_VENDOR=STMicroelectronics
 SET UV2_TARGET=Board
