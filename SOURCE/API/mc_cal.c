@@ -440,5 +440,68 @@ sint16 Mc_LowPassFilter(Mc_LpParType *lp, sint16 input)
 
 	return (out >> 15);
 }
+/****************************************************************
+* FUNCTION : 
+* DESCRIPTION :  
+* INPUTS : 
+* OUTPUTS : 
+*****************************************************************/
+sint16 Mat_ExePi(TMat_Pi *pPi, sint16 Error)
+{
+  sint32 IOut;
+  sint32 PiOut;
+  sint32 Min;
+  sint32 Max;
+  sint32 Temp;
+
+  /* I output = old output + error * I parameter */
+  if(ABS(Error) < pPi->Emax)
+  {
+  	IOut = pPi->IOut + (((sint32)Error * (sint32)pPi->Ki)/10);
+  }else
+  {
+  	IOut = pPi->IOut;
+  }
+  
+  
+  /* Limit I output */
+  Min = ((sint32)(pPi->IMin)) << 15u;
+  if (IOut < Min)
+  {
+    IOut = Min;
+  }  
+  else
+  {
+    Max = ((sint32)(pPi->IMax)) << 15u;
+    if (IOut > Max)
+    {
+      IOut = Max;
+    }  
+  }    
+  /* Store I output */
+  pPi->IOut = IOut;
+
+  /* PI output = upper half of (I output + saturate(error * P parameter) * 64) */
+  //Temp = __ssat((Error * ((sint32)pPi->Kp))/10, 31u - 6u);
+  Temp = (Error * ((sint32)pPi->Kp))/10;
+  PiOut = (IOut + (Temp << 6u)) >> 15u;
+  
+  /* Limit PI output */
+  Min = (sint32)(pPi->PiMin);
+  if (PiOut < Min)
+  {
+    PiOut = Min;
+  }  
+  else
+  {
+    Max = (sint32)(pPi->PiMax);
+    if (PiOut > Max)
+    {
+      PiOut = Max;
+    }  
+  }    
+  return (sint16)PiOut;
+} /* End of Mat_ExePi_Windup */
+
 #endif
 

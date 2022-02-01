@@ -4,33 +4,19 @@
 #include "motorControl.h"
 
 
-u8  OpenFlag = 0;
 u16 Mc_ShuntCurrent_Zero_A;
 
 u16 Mc_ShuntCurrent_Raw_A;
-
-s16 Mc_ShuntCurrent_A;
-
-s16 Mc_ShuntCurrent_B;
-
-s16 Mc_ShuntCurrent_C;
-
-s16 Mc_PhaseCurrent_Alpha;
-s16 Mc_PhaseCurrent_Beta;
-s16 Mc_PhaseCurrent_Alpha_FL;
-s16 Mc_PhaseCurrent_Beta_FL;
 
 u16 Mc_ShuntCurrent_Zero_C;
 
 u16 Mc_ShuntCurrent_Raw_C;
 
-
-
-
-u16 Mc_Electric_Angle = 0;
-s16 Mc_Electric_Speed = 50;
-u16 Mc_Electric_Acc = 0;
-u16 Mc_Electric_Duty = 300;
+TMat_Pi PiControlId;
+TMat_Pi PiControlIq;
+TMat_Pi PiControlVd;
+TMat_Pi PiControlVq;
+TMat_Pi PiControlSpeed;
 
 
 typedef enum
@@ -139,8 +125,23 @@ typedef struct
 }mc_operate_var;
 
 typedef struct
+{
+	s16 desId;
+	s16 desIq;
+
+	s16 desVd;
+	s16 desVq;
+
+	s16 desVA;
+	s16 desVB;
+
+	s16 desSpeed;
+}mc_control_var;
+
+typedef struct
 {	
 	mc_operate_state state;
+	mc_control_var control;
 	mc_operate_var oper;
 	mc_motor_para mPara;
 	mc_svmGen_struct svmGen;
@@ -174,6 +175,46 @@ void Mc_SwInit(void)
 
 	FocCtrlVar.anglePll.pllKp = 100;
 
+
+	PiControlId.Ki = 0;
+	PiControlId.Kp = 0;
+	PiControlId.Emax = 0;
+	PiControlId.IMax = 0;
+	PiControlId.IMin = 0;
+	PiControlId.PiMax = PiControlId.IMax;
+	PiControlId.PiMin = PiControlId.IMin;
+		
+	PiControlIq.Ki = 0;
+	PiControlIq.Kp = 0;
+	PiControlIq.Emax = 0;
+	PiControlIq.IMax = 0;
+	PiControlIq.IMin = 0;
+	PiControlIq.PiMax = PiControlIq.IMax;
+	PiControlIq.PiMin = PiControlIq.IMin;
+
+	PiControlVd.Ki = 0;
+	PiControlVd.Kp = 0;
+	PiControlVd.Emax = 0;
+	PiControlVd.IMax = 0;
+	PiControlVd.IMin = 0;
+	PiControlVd.PiMax = PiControlVd.IMax;
+	PiControlVd.PiMin = PiControlVd.IMin;
+
+	PiControlVq.Ki = 0;
+	PiControlVq.Kp = 0;
+	PiControlVq.Emax = 0;
+	PiControlVq.IMax = 0;
+	PiControlVq.IMin = 0;
+	PiControlVq.PiMax = PiControlVq.IMax;
+	PiControlVq.PiMin = PiControlVq.IMin;
+
+	PiControlSpeed.Ki = 0;
+	PiControlSpeed.Kp = 0;
+	PiControlSpeed.Emax = 0;
+	PiControlSpeed.IMax = 0;
+	PiControlSpeed.IMin = 0;
+	PiControlSpeed.PiMax = PiControlSpeed.IMax;
+	PiControlSpeed.PiMin = PiControlSpeed.IMin;
 }
 
 void Mc_Svpwm_NSectorCal(s16 Ualpha, s16 Ubeta)
