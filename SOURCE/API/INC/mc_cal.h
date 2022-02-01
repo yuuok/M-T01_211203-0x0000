@@ -44,6 +44,8 @@ MC_CAL_EXT sint32 Math_Cos(uint16 angle);
 MC_CAL_EXT uint16 Math_ArcTanCal(sint32 a, sint32 b, uint32 *amp);
 MC_CAL_EXT void Math_Clack(s16 Ua, s16 Ub, s16 Uc, s16* Ualpha, s16* Ubeta);
 MC_CAL_EXT void Math_Clack_Inv(s16* Ua, s16* Ub, s16* Uc, s16 Ualpha, s16 Ubeta);
+MC_CAL_EXT void Math_Park(s16 Ualpha, s16 Ubeta, u16 angleQ16, s16* Ud, s16* Uq);
+MC_CAL_EXT void Math_Park_Inv(s16* Ualpha, s16* Ubeta, u16 angleQ16, s16 Ud, s16 Uq);
 MC_CAL_EXT sint16 Mc_LowPassFilter(Mc_LpParType *lp, sint16 input);
 
 

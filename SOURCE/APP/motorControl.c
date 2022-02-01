@@ -33,40 +33,15 @@ u16 Mc_Electric_Acc = 0;
 u16 Mc_Electric_Duty = 300;
 
 
-Mc_LpParType Mc_Lp_Ialpha = {
-	2000,
-	2000,
-	0
-};
-Mc_LpParType Mc_Lp_Ibeta = {
-	2000,
-	2000,
-	0,
-};
-Mc_LpParType Mc_Lp_ActSpeed = {
-	2000,
-	2000,
-	0,
-};
-Mc_LpParType Mc_inte_Vsa = {
-	161,
-	35,
-	0,
-};
-
-Mc_LpParType Mc_inte_Vsb = {
-	161,
-	35,
-	0,
-};
-Mc_LpParType Mc_inte_AnglePll = {
-	161,
-	35,
-	0,
-};
-s16 Mc_StatorResistor = 1;
-s16 Mc_StatorInductor = 1;
-
+typedef enum
+{
+	MC_STATE_INIT = 0,
+	MC_STATE_STOP,
+	MC_STATE_SWITCH,
+	MC_STATE_OPEN,
+	MC_STATE_CLOSE,
+	MC_STATE_FAULT
+}mc_operate_state;
 
 typedef struct 
 {
@@ -156,6 +131,7 @@ typedef struct
 
 typedef struct 
 {
+	u16 angle;
 	s16 actSpeed;
 	s16 wmSpeed;
 	s16 refSpeed;
@@ -164,7 +140,7 @@ typedef struct
 
 typedef struct
 {	
-
+	mc_operate_state state;
 	mc_operate_var oper;
 	mc_motor_para mPara;
 	mc_svmGen_struct svmGen;
@@ -176,7 +152,6 @@ typedef struct
 } foc_svm_para_struct;
 foc_svm_para_struct FocCtrlVar;
 
-
 void Mc_SwInit(void)
 {
 	FocCtrlVar.mPara.res = 1;
@@ -185,6 +160,7 @@ void Mc_SwInit(void)
 	FocCtrlVar.svmGen.angle = 0;
 	FocCtrlVar.svmGen.duty = 200;
 	FocCtrlVar.oper.angleSpeed = 0;
+	FocCtrlVar.state = MC_STATE_INIT;
 
 	FocCtrlVar.current.lpA.coefA = 2000;
 	FocCtrlVar.current.lpA.coefB = 2000;
@@ -195,6 +171,8 @@ void Mc_SwInit(void)
 	FocCtrlVar.fluxEst.inteA.coefB = 35;
 	FocCtrlVar.fluxEst.inteB.coefA = 161;
 	FocCtrlVar.fluxEst.inteB.coefB = 35;
+
+	FocCtrlVar.anglePll.pllKp = 100;
 
 }
 
@@ -333,116 +311,25 @@ u8 Mc_AngleSpeedCal(u16 angle, u16 angleLast, s16* speedPtr, u32* sum, u16* cnt)
 	return caled;
 }
 
-#if 0
-u16 CalAngle = 0;
-u32 FluxAmp = 0;
-void Mc_FluxAngleCal(s16 ualpha, s16 ubeta, s16 curalpha, s16 curbeta)
-{
-	//fluxa = inteUsa-inteRia-Lsia
-	//fluxb = inteUsb-inteRib-Lsib
-	FocCtrlVar.lsiaQ16 = ((s32)Mc_StatorInductor * (s32)curalpha*65536)/1000;
-	FocCtrlVar.lsibQ16 = ((s32)Mc_StatorInductor * (s32)curbeta*65536)/1000;
-	FocCtrlVar.rsiaQ16 = ((s32)Mc_StatorResistor * (s32)curalpha*65536)/1000;
-	FocCtrlVar.rsibQ16 = ((s32)Mc_StatorResistor * (s32)curbeta*65536)/1000;
-	FocCtrlVar.fluxAlphaQ16 = Mc_LowPassFilter(&Mc_inte_Vsa, ((s32)ualpha*65536)/10 - FocCtrlVar.rsiaQ16) - FocCtrlVar.lsiaQ16;
-	FocCtrlVar.fluxBetaQ16 = Mc_LowPassFilter(&Mc_inte_Vsb, ((s32)ubeta*65536)/10 - FocCtrlVar.rsibQ16) - FocCtrlVar.lsibQ16;
-	FocCtrlVar.fluxCalAngleLast = FocCtrlVar.fluxCalAngle;
-	FocCtrlVar.fluxCalAngle = Math_ArcTanCal(FocCtrlVar.fluxAlphaQ16,FocCtrlVar.fluxBetaQ16,&FocCtrlVar.fluxAmpQ16);
-
-}
-void Mc_AnglePll(void)
-{
-	s32 deltaAngle = 0;
-	s32 omega = 0;	
-	deltaAngle = (s32)FocCtrlVar.fluxEst.Angle - (s32)FocCtrlVar.anglePll.angle;
-	(void)Mc_AngleSpeedCal(
-		(s32)FocCtrlVar.anglePll.angle, 
-		FocCtrlVar.anglePll.angleLast, 
-		&FocCtrlVar.anglePll.speed , 
-		&FocCtrlVar.anglePll.sum, 
-		&FocCtrlVar.anglePll.cnt);
-	omega = (s32)deltaAngle  + (s32)FocCtrlVar.anglePll.speed;
-	FocCtrlVar.anglePll.angleLast = FocCtrlVar.anglePll.angle;
-	FocCtrlVar.anglePll.angle += ((s32)omega * (s32)FocCtrlVar.anglePll.pllKp)/100;	
-}
-
-u8 closeLoopFlag = 0;
-u16 AngleDelta = 0;
-u16 calAngleAddDelta = 0;
-u16 speedCnt = 0;
-u16 speedSum = 0;
-void Mc_Svpwm(void)
-{
-	u16 angle = 0;
-	s16 currentA = 0;
-	s16 currentB = 0;
-	s16 currentC = 0;
-	s16 dutyAlpha = 0;	
-	s16 dutyBeta = 0;
-	
-	angle = (1500 * Mc_Electric_Angle) >> 16;
-	dutyAlpha = ((s32)Mc_Electric_Duty * Math_Cos(angle)) >> 15;
-	dutyBeta = ((s32)Mc_Electric_Duty * Math_Sin(angle)) >> 15;
-
-	
-	Mc_Svpwm_NSectorCal(dutyAlpha,dutyBeta);
-	Mc_Svpwm_XYZTimeCal(dutyAlpha,dutyBeta);
-	Mc_Svpwm_TsubCal(FocCtrlVar.svmGen.xTime,FocCtrlVar.svmGen.yTime, FocCtrlVar.svmGen.zTime, FocCtrlVar.svmGen.n);
-	Mc_Svpwm_TcmCal(FocCtrlVar.svmGen.n,FocCtrlVar.svmGen.t1Time, FocCtrlVar.svmGen.t2Time);
-	if(OpenFlag > 0)
-	{
-		PwmTim1_BridgeSet(PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM);
-		PwmTim1_DutySet(FocCtrlVar.svmGen.cm1Time, FocCtrlVar.svmGen.cm2Time, FocCtrlVar.svmGen.cm3Time);
-	}
-	else
-	{
-		PwmTim1_BridgeSet(PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF);
-		PwmTim1_DutySet(0, 0, 0);
-	}
-	currentA = (s16)Mc_ShuntCurrent_Raw_A - (s16)Mc_ShuntCurrent_Zero_A;
-	currentC = (s16)Mc_ShuntCurrent_Raw_C - (s16)Mc_ShuntCurrent_Zero_C;
-
-	//adcVol = adc*maxVol/4095
-	//inputVol = adcVol/10
-	//current = inputVol / 0.005
-	//current = adcvol*0.1*200;
-	//current = adc*3.3*200*0.1/4095
-	//ampCurrent = 1000*current;
-	
-	Mc_ShuntCurrent_A = (s32)currentA*3223/100;
-	Mc_ShuntCurrent_C = (s32)currentC*3223/100;
-	Mc_ShuntCurrent_B = -Mc_ShuntCurrent_A - Mc_ShuntCurrent_C;
-	Mc_Volt_Ualpha = (dutyAlpha * PAR_DcLinkVol / 10);
-	Mc_Volt_Ubeta = (dutyBeta * PAR_DcLinkVol / 10);
-	Math_Clack(Mc_ShuntCurrent_A, Mc_ShuntCurrent_B, Mc_ShuntCurrent_C, &Mc_PhaseCurrent_Alpha, &Mc_PhaseCurrent_Beta);
-	
-	Mc_PhaseCurrent_Alpha_FL = (Mc_LowPassFilter(&Mc_Lp_Ialpha, Mc_PhaseCurrent_Alpha));
-	Mc_PhaseCurrent_Beta_FL = (Mc_LowPassFilter(&Mc_Lp_Ibeta, Mc_PhaseCurrent_Beta));
-
-	Mc_FluxAngleCal(Mc_Volt_Ualpha, Mc_Volt_Ubeta, Mc_PhaseCurrent_Alpha_FL, Mc_PhaseCurrent_Beta_FL);
-
-	Mc_AnglePll();
-
-	(void)Mc_AngleSpeedCal(FocCtrlVar.fluxCalAngle, FocCtrlVar.fluxCalAngleLast, &FocCtrlVar.actSpeed, &speedSum, &speedCnt);
-	
-	if(closeLoopFlag > 0)
-	{
-		Mc_Electric_Angle = FocCtrlVar.fluxAnglePll + AngleDelta + FocCtrlVar.angleSpeedPll;
-	}
-	else
-	{
-		Mc_Electric_Angle += Mc_Electric_Speed;
-	}
-	
-	
-	
-}
-#endif
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+void Mc_ActiveBridge(void)
+{
+	PwmTim1_BridgeSet(PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM,PWM_PWM);
+}
+void Mc_CloseBridge(void)
+{
+	PwmTim1_BridgeSet(PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF,PWM_OFF);
+	PwmTim1_DutySet(0, 0, 0);
+}
 void Mc_VoltageCal(u16 dcLink)
 {
 	FocCtrlVar.voltage.A = (FocCtrlVar.svmGen.dutyA * dcLink / 10);
 	FocCtrlVar.voltage.B = (FocCtrlVar.svmGen.dutyB * dcLink / 10);
+	Math_Park(FocCtrlVar.voltage.A, 
+			  FocCtrlVar.voltage.B, 
+			  FocCtrlVar.svmGen.angle, 
+			  &FocCtrlVar.voltage.d, 
+			  &FocCtrlVar.voltage.q);
 }
 
 void Mc_CurrentCal(void)
@@ -462,10 +349,16 @@ void Mc_CurrentCal(void)
 	  , FocCtrlVar.current.b
 	  , FocCtrlVar.current.c
 	  , &FocCtrlVar.current.A
-	  , &FocCtrlVar.current.A);
+	  , &FocCtrlVar.current.B);
 
 	FocCtrlVar.current.filA = Mc_LowPassFilter(&FocCtrlVar.current.lpA,FocCtrlVar.current.A);
 	FocCtrlVar.current.filB = Mc_LowPassFilter(&FocCtrlVar.current.lpB,FocCtrlVar.current.B);
+
+	Math_Park(FocCtrlVar.current.filA, 
+		  	  FocCtrlVar.current.filB, 
+		  	  FocCtrlVar.anglePll.angle, 
+		  	  &FocCtrlVar.current.d, 
+		  	  &FocCtrlVar.current.q);
 }
 void Mc_FluxEst(void)
 {
@@ -515,6 +408,41 @@ void Mc_SvmGen(void)
 }
 void Mc_FocMainFunc(void)
 {
+	switch(FocCtrlVar.state)
+	{
+		case MC_STATE_INIT:
+			FocCtrlVar.state = MC_STATE_STOP;
+		break;
+		case MC_STATE_STOP:
+			if(FocCtrlVar.oper.angleSpeed > 0)
+			{
+				FocCtrlVar.state = MC_STATE_OPEN;
+			}
+			else
+			{
+				Mc_CloseBridge();
+			}
+		break;
+		case MC_STATE_SWITCH:
+		break;
+		case MC_STATE_OPEN:
+			if(FocCtrlVar.oper.angleSpeed == 0)
+			{
+				FocCtrlVar.state = MC_STATE_STOP;
+			}
+			else
+			{
+				FocCtrlVar.oper.angle += FocCtrlVar.oper.angleSpeed;
+				FocCtrlVar.svmGen.angle = FocCtrlVar.oper.angle;
+				Mc_ActiveBridge();
+			}
+			
+		break;
+		case MC_STATE_CLOSE:
+		break;
+		case MC_STATE_FAULT:
+		break;
+	}
 	//voltage
 	Mc_VoltageCal(PAR_DcLinkVol);
 	//current

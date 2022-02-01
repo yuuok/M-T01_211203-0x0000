@@ -15,6 +15,7 @@ int main(void)
 	Adc_Init();
 	Dma_Init();
 	Nvic_Init();	
+	Mc_SwInit();
 	delay_dead_ms(10);
 	
 	while(1)

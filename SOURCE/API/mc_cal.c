@@ -203,12 +203,9 @@ const uint16 Mc_ArctanTable[1025] =
 * INPUTS : 
 * OUTPUTS : 
 *****************************************************************/
-uint8 ATCCASE = 0;
-uint16 angleCheck = 0;
-uint16 absaCehck = 0;
-uint16 absbCheck = 0;
 uint16 Math_ArcTanCal(sint32 a, sint32 b, uint32 *amp)
 {
+	uint8 ATCCASE = 0;
 	uint32 large = 0;
 	uint32 small = 0;
 	uint32 arcCof = 0;
@@ -230,9 +227,6 @@ uint16 Math_ArcTanCal(sint32 a, sint32 b, uint32 *amp)
 	{
 		absb = b;
 	}
-
-	absaCehck = absa;
-	absbCheck = absb;
 
 
 	if(a <= 0)
@@ -281,7 +275,6 @@ uint16 Math_ArcTanCal(sint32 a, sint32 b, uint32 *amp)
 	}
 	arcCof = small*1024/large;
 	angle = (Mc_ArctanTable[arcCof]);
-	angleCheck = angle;
 	arcCof = 376 - arcCof*3/16;
 	if(absa>=absb)
 	{
@@ -290,8 +283,6 @@ uint16 Math_ArcTanCal(sint32 a, sint32 b, uint32 *amp)
 	{
 		*amp = (absb<<15)/Mc_sin[arcCof];
 	}
-
-	
 	switch(ATCCASE)
 	{
 		case 1:
@@ -412,8 +403,31 @@ void Math_Clack_Inv(s16* Ua, s16* Ub, s16* Uc, s16 Ualpha, s16 Ubeta)
 * INPUTS : 
 * OUTPUTS : 
 *****************************************************************/
-//coefA = 200
-//coefB = 30
+void Math_Park(s16 Ualpha, s16 Ubeta, u16 angleQ16, s16* Ud, s16* Uq)
+{
+	u16 theta = (1500 * (u32)angleQ16) >> 16;
+	*Ud = (Math_Cos(theta)*Ualpha + Math_Sin(theta)*Ubeta)>>15;
+	*Uq = (-1*Math_Sin(theta)*Ualpha + Math_Cos(theta)*Ubeta)>>15;
+}
+/****************************************************************
+* FUNCTION : 
+* DESCRIPTION :  
+* INPUTS : 
+* OUTPUTS : 
+*****************************************************************/
+void Math_Park_Inv(s16* Ualpha, s16* Ubeta, u16 angleQ16, s16 Ud, s16 Uq)
+{
+	u16 theta = (1500 * (u32)angleQ16) >> 16;
+	*Ualpha = (Ud*Math_Cos(theta) - Uq*Math_Sin(theta))>>15;
+	*Ubeta  = (Ud*Math_Sin(theta) + Uq*Math_Cos(theta))>>15;
+}
+
+/****************************************************************
+* FUNCTION : 
+* DESCRIPTION :  
+* INPUTS : 
+* OUTPUTS : 
+*****************************************************************/
 sint16 Mc_LowPassFilter(Mc_LpParType *lp, sint16 input)
 {
 	sint32 out;
@@ -426,6 +440,5 @@ sint16 Mc_LowPassFilter(Mc_LpParType *lp, sint16 input)
 
 	return (out >> 15);
 }
-
-
 #endif
+
