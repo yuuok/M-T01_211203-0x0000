@@ -6,7 +6,8 @@
 
 void TIM2_Update_Handler(void)
 {
-	Mc_Svpwm();
+	//Mc_Svpwm();
+	Mc_FocMainFunc();
 	if(Common_Delay_Struct.startFlag_ms > 0)
 	{
 		if(Common_Delay_Struct.count_1ms > 0)

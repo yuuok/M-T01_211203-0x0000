@@ -27,8 +27,9 @@ extern u16 Mc_ShuntCurrent_Raw_C;
 
 void Mc_Svpwm(void);
 
+void Mc_FocMainFunc(void);
 
-
+void Mc_SwInit(void);
 
 
 
